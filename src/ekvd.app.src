@@ -9,6 +9,6 @@
                   kernel,
                   stdlib
                  ]},
-  {mod, { ekvd, []}},
+  {start_phases, []},
   {env, []}
  ]}.
