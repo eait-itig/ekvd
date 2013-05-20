@@ -34,8 +34,12 @@ pack_request(OpNum, PayloadSize, Key) ->
 
 unpack_request(Bin) ->
 	<<OpNum:8/integer, 0:8, PayloadSize:16/big, Key:32/binary-unit:8, Data/binary>> = Bin,
-	if (size(Data) =/= PayloadSize) ->
+	if ((OpNum =/= ?OP_CREATED) andalso (size(Data) =/= PayloadSize)) ->
 		error(badpacket);
+	((OpNum =:= ?OP_CREATED) andalso (size(Data) =/= 32)) ->
+		error(badpacket);
+	(OpNum =:= ?OP_CREATED) ->
+		{OpNum, zero_truncate(Key), zero_truncate(Data)};
 	true ->
 		{OpNum, zero_truncate(Key), Data}
 	end.
