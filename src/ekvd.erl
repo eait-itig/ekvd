@@ -39,10 +39,9 @@ unpack_request(Bin) ->
 	if (not ((OpNum =:= ?OP_UPDATED) orelse (OpNum =:= ?OP_CREATED))
 			andalso (byte_size(Data) =/= PayloadSize)) ->
 		error(badpacket);
-	(((OpNum =:= ?OP_CREATED) orelse (OpNum =:= ?OP_UPDATED))
-			andalso (byte_size(Data) =/= 32)) ->
+	((OpNum =:= ?OP_CREATED) andalso (byte_size(Data) =/= 32)) ->
 		error(badpacket);
-	(OpNum =:= ?OP_CREATED) orelse (OpNum =:= ?OP_UPDATED) ->
+	(OpNum =:= ?OP_CREATED) ->
 		{OpNum, zero_truncate(Key), zero_truncate(Data)};
 	true ->
 		{OpNum, zero_truncate(Key), Data}
