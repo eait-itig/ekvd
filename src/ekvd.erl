@@ -19,8 +19,8 @@
 -define(OP_DELETE, 5).
 -define(OP_DELETED, 6).
 -define(OP_SYNC, 7).
--define(OP_UPDATE, 8).
--define(OP_UPDATED, 9).
+-define(OP_UPDATE, 10).
+-define(OP_UPDATED, 11).
 
 zero_truncate(Bin) ->
 	case binary:split(Bin, <<0:8>>) of
