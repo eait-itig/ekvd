@@ -161,4 +161,4 @@ gen_cookie_id() ->
 	Bytes = crypto:strong_rand_bytes(24),
 	Base = base64:encode(Bytes),
 	Base2 = binary:replace(Base, <<"/">>, <<"_">>, [global]),
-	binary_to_list(binary:replace(Base2, <<"+">>, <<"-">>, [global])).
+	binary:replace(Base2, <<"+">>, <<"-">>, [global]).
