@@ -161,3 +161,11 @@ gen_cookie_id() ->
 	Base = base64:encode(Bytes),
 	Base2 = binary:replace(Base, <<"/">>, <<"_">>, [global]),
 	binary:replace(Base2, <<"+">>, <<"-">>, [global]).
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+zero_truncate_test() ->
+	?assertMatch(<<"abc">>, zero_truncate(<<"abc",0,"b">>)).
+
+-endif.
