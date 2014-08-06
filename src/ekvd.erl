@@ -169,4 +169,7 @@ zero_truncate_test() ->
 	?assertMatch(<<"abc">>, zero_truncate(<<"abc",0,"b">>)),
 	?assertMatch(<<"abc">>, zero_truncate(<<"abc">>)).
 
+gen_cookie_id_test() ->
+	?assertMatch(32, byte_size(gen_cookie_id())).
+
 -endif.
