@@ -166,6 +166,7 @@ gen_cookie_id() ->
 -include_lib("eunit/include/eunit.hrl").
 
 zero_truncate_test() ->
-	?assertMatch(<<"abc">>, zero_truncate(<<"abc",0,"b">>)).
+	?assertMatch(<<"abc">>, zero_truncate(<<"abc",0,"b">>)),
+	?assertMatch(<<"abc">>, zero_truncate(<<"abc">>)).
 
 -endif.
