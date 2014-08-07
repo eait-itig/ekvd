@@ -10,14 +10,18 @@ main(Args) ->
 	],
 	Args2 = getopt(Args, Opts, []),
 	{OptArgs, ArgArgs} = lists:partition(fun(K) -> is_tuple(K) end, lists:reverse(Args2)),
-	OptArgs2 = case proplists:get_value(host, OptArgs) of
+	OptArgs2 = case proplists:get_value(bucket, OptArgs) of
 		undefined -> OptArgs;
+		StrBucket -> lists:keyreplace(bucket, 1, OptArgs, {bucket, list_to_binary(StrBucket)})
+	end,
+	OptArgs3 = case proplists:get_value(host, OptArgs2) of
+		undefined -> OptArgs2;
 		StrHost -> case inet:getaddr(StrHost, inet) of
-			{ok, Ip} when is_tuple(Ip) -> [{ip_address, Ip} | OptArgs];
+			{ok, Ip} when is_tuple(Ip) -> [{ip_address, Ip} | OptArgs2];
 			_ -> io:format("failed to look up ~w\n", [StrHost]), halt(1)
 		end
 	end,
-	main_opt(ArgArgs, OptArgs2).
+	main_opt(ArgArgs, OptArgs3).
 
 getopt([], _Opts, Args) -> Args;
 getopt([[$-, $- | K], V | Rest], Opts, Args) ->
