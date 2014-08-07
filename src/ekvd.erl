@@ -10,6 +10,7 @@
 -module(ekvd).
 
 -export([get/1, create/2, get/2, create/1, update/2, update/3]).
+-export([checksig/3, checksig/4]).
 
 -define(OP_CREATE, 0).
 -define(OP_CREATED, 1).
@@ -21,6 +22,7 @@
 -define(OP_SYNC, 7).
 -define(OP_UPDATE, 10).
 -define(OP_UPDATED, 11).
+-define(OP_CHECKSIG, 12).
 
 zero_truncate(Bin) ->
 	case binary:split(Bin, <<0:8>>) of
@@ -30,9 +32,16 @@ zero_truncate(Bin) ->
 			All
 	end.
 
-pack_request(OpNum, PayloadSize, Key) ->
+pack_request(OpNum, Key, Payload) ->
 	PadBytes = (32 - byte_size(Key)),
-	<<OpNum:8/integer, 0:8, PayloadSize:16/big, Key/binary, 0:PadBytes/unit:8>>.
+	PayloadSize = byte_size(Payload),
+	<<OpNum:8/integer, 0:8, PayloadSize:16/big, Key/binary, 0:PadBytes/unit:8, Payload/binary>>.
+
+pack_checksig(Cookie, Uid, Sig, Data) ->
+	UidSize = byte_size(Uid),
+	SigSize = byte_size(Sig),
+	Payload = <<UidSize, Uid/binary, SigSize, Sig/binary, Data/binary>>,
+	pack_request(?OP_CHECKSIG, Cookie, Payload).
 
 unpack_request(Bin) ->
 	<<OpNum:8/integer, 0:8, PayloadSize:16/big, Key:32/binary-unit:8, Data/binary>> = Bin,
@@ -51,7 +60,8 @@ get(_, _, 0) ->
 	{error, timeout};
 get(Key, Options, Attempts) ->
 	{ok, Sock} = gen_udp:open(0, [binary]),
-	Req = pack_request(?OP_REQUEST, 0, Key),
+	Payload = proplists:get_value(bucket, Options, <<>>),
+	Req = pack_request(?OP_REQUEST, Key, Payload),
 
 	IpAddr = proplists:get_value(ip_address, Options, {127, 0, 0, 1}),
 	Port = proplists:get_value(port, Options, 1080),
@@ -82,11 +92,54 @@ get(Key) ->
 %% <ul>
 %%   <li><code>ip_address</code> -- tuple format ip address to connect to</li>
 %%   <li><code>port</code> -- integer port to connect to</li>
+%%   <li><code>bucket</code> -- a bucket to provide as payload (for fakvd)</li>
 %% </ul>
 -spec get(Key :: binary(), Options :: proplists:proplist()) -> {ok, binary()} | {error, term()}.
 get(Key, Options) ->
 	Retries = proplists:get_value(retries, Options, 3),
 	get(Key, Options, Retries).
+
+checksig(_Uid, _Sig, _Data, _Opts, 0) ->
+	{error, timeout};
+checksig(Uid, Sig, Data, Options, Attempts) ->
+	{ok, Sock} = gen_udp:open(0, [binary]),
+	Cookie = gen_cookie_id(),
+	Req = pack_checksig(Cookie, Uid, Sig, Data),
+
+	IpAddr = proplists:get_value(ip_address, Options, {127, 0, 0, 1}),
+	Port = proplists:get_value(port, Options, 1080),
+	gen_udp:send(Sock, IpAddr, Port, Req),
+
+	receive
+		{udp, Sock, _, _, Resp} ->
+			case (catch unpack_request(Resp)) of
+				{?OP_VALUE, Cookie, RetData} ->
+					{ok, RetData};
+				{?OP_NOVALUE, Cookie, _} ->
+					{error, novalue};
+				_Other ->
+					{error, badresponse}
+			end
+	after 1000 ->
+		checksig(Uid, Sig, Data, Options, Attempts - 1)
+	end.
+
+%% @doc Checks a machine auth signature over a given data blob.
+%% Defaults to connecting to localhost on port 1080.
+-spec checksig(Uid :: binary(), Signature :: binary(), Data :: binary()) -> {ok, binary()} | {error, term()}.
+checksig(Uid, Sig, Data) ->
+	checksig(Uid, Sig, Data, [], 3).
+
+%% @doc Checks a machine auth signature over a given data blob.
+%% Valid options:
+%% <ul>
+%%   <li><code>ip_address</code> -- tuple format ip address to connect to</li>
+%%   <li><code>port</code> -- integer port to connect to</li>
+%% </ul>
+-spec checksig(Uid :: binary(), Signature :: binary(), Data :: binary(), Options :: proplists:proplist()) -> {ok, binary()} | {error, term()}.
+checksig(Uid, Sig, Data, Options) ->
+	Retries = proplists:get_value(retries, Options, 3),
+	checksig(Uid, Sig, Data, Options, Retries).
 
 create(_, _, 0) ->
 	{error, timeout};
@@ -94,8 +147,7 @@ create(Value, Options, Attempts) ->
 	{ok, Sock} = gen_udp:open(0, [binary]),
 
 	Cookie = gen_cookie_id(),
-	Req = pack_request(?OP_CREATE, byte_size(Value), Cookie),
-	Packet = <<Req/binary, Value/binary>>,
+	Packet = pack_request(?OP_CREATE, Cookie, Value),
 
 	IpAddr = proplists:get_value(ip_address, Options, {127, 0, 0, 1}),
 	Port = proplists:get_value(port, Options, 1080),
@@ -127,8 +179,7 @@ update(_, _, _, 0) ->
 update(Key, Value, Options, Attempts) ->
 	{ok, Sock} = gen_udp:open(0, [binary]),
 
-	Req = pack_request(?OP_UPDATE, byte_size(Value), Key),
-	Packet = <<Req/binary, Value/binary>>,
+	Packet = pack_request(?OP_UPDATE, Key, Value),
 
 	IpAddr = proplists:get_value(ip_address, Options, {127, 0, 0, 1}),
 	Port = proplists:get_value(port, Options, 1080),

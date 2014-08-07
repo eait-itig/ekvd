@@ -5,7 +5,8 @@ main(Args) ->
 	Opts = [
 		{host, "h", "host", string},
 		{port, "p", "port", string},
-		{retries, "r", "retries", integer}
+		{retries, "r", "retries", integer},
+		{bucket, "b", "bucket", string}
 	],
 	Args2 = getopt(Args, Opts, []),
 	{OptArgs, ArgArgs} = lists:partition(fun(K) -> is_tuple(K) end, lists:reverse(Args2)),
@@ -61,11 +62,28 @@ main_opt(["update", Key, Val], Opts) ->
 		ok -> io:format("ok\n");
 		{error, Term} -> io:format("ERROR: ~p\n", [Term]), halt(1)
 	end;
+main_opt(["checksig", Uid, "secret:" ++ Secret64, Data64], Opts) ->
+	Data = base64:decode(Data64),
+	Sig = crypto:hmac(sha, base64:decode(Secret64), Data),
+	case ekvd:checksig(list_to_binary(Uid), Sig, Data, Opts) of
+		{ok, RetData} -> io:format("~s\n", [RetData]);
+		{error, Term} -> io:format("ERROR: ~p\n", [Term]), halt(1)
+	end;
+main_opt(["checksig", Uid, Sig64, Data64], Opts) ->
+	Data = base64:decode(Data64),
+	Sig = base64:decode(Sig64),
+	case ekvd:checksig(list_to_binary(Uid), Sig, Data, Opts) of
+		{ok, RetData} -> io:format("~s\n", [RetData]);
+		{error, Term} -> io:format("ERROR: ~p\n", [Term]), halt(1)
+	end;
 main_opt(_, _Opts) ->
 	io:format("usage: ekvdcmd [opts] get <key>\n"),
 	io:format("                      create <value>\n"),
 	io:format("                      update <key> <value>\n"),
+	io:format("                      checksig <uid> secret:<base64secret> <base64data>\n"),
+	io:format("                      checksig <uid> <base64sig> <base64data>\n"),
 	io:format("options: -h|--host [hostname|ip]\n"),
 	io:format("         -p|--port [port]\n"),
 	io:format("         -r|--retries [num]\n"),
+	io:format("         -b|--bucket [bucket]\n"),
 	halt(1).
