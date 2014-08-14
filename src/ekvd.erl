@@ -24,6 +24,8 @@
 -define(OP_UPDATED, 11).
 -define(OP_CHECKSIG, 12).
 
+-define(DEFAULT_RETRIES, 5).
+
 zero_truncate(Bin) ->
 	case binary:split(Bin, <<0:8>>) of
 		[Left, _] ->
@@ -85,7 +87,7 @@ get(Key, Options, Attempts) ->
 %% Defaults to connecting to localhost on port 1080.
 -spec get(Key :: binary()) -> {ok, binary()} | {error, term()}.
 get(Key) ->
-	get(Key, [], 3).
+	get(Key, [], ?DEFAULT_RETRIES).
 
 %% @doc Gets the value associated with a given cookie.
 %% Valid options:
@@ -96,7 +98,7 @@ get(Key) ->
 %% </ul>
 -spec get(Key :: binary(), Options :: proplists:proplist()) -> {ok, binary()} | {error, term()}.
 get(Key, Options) ->
-	Retries = proplists:get_value(retries, Options, 3),
+	Retries = proplists:get_value(retries, Options, ?DEFAULT_RETRIES),
 	get(Key, Options, Retries).
 
 checksig(_Uid, _Sig, _Data, _Opts, 0) ->
@@ -128,7 +130,7 @@ checksig(Uid, Sig, Data, Options, Attempts) ->
 %% Defaults to connecting to localhost on port 1080.
 -spec checksig(Uid :: binary(), Signature :: binary(), Data :: binary()) -> {ok, binary()} | {error, term()}.
 checksig(Uid, Sig, Data) ->
-	checksig(Uid, Sig, Data, [], 3).
+	checksig(Uid, Sig, Data, [], ?DEFAULT_RETRIES).
 
 %% @doc Checks a machine auth signature over a given data blob.
 %% Valid options:
@@ -138,7 +140,7 @@ checksig(Uid, Sig, Data) ->
 %% </ul>
 -spec checksig(Uid :: binary(), Signature :: binary(), Data :: binary(), Options :: proplists:proplist()) -> {ok, binary()} | {error, term()}.
 checksig(Uid, Sig, Data, Options) ->
-	Retries = proplists:get_value(retries, Options, 3),
+	Retries = proplists:get_value(retries, Options, ?DEFAULT_RETRIES),
 	checksig(Uid, Sig, Data, Options, Retries).
 
 create(_, _, 0) ->
@@ -167,11 +169,11 @@ create(Value, Options, Attempts) ->
 
 -spec create(Value :: binary()) -> {ok, Key :: binary()} | {error, term()}.
 create(Value) ->
-	create(Value, [], 3).
+	create(Value, [], ?DEFAULT_RETRIES).
 
 -spec create(Value :: binary(), Options :: proplists:proplist()) -> {ok, Key :: binary()} | {error, term()}.
 create(Value, Options) ->
-	Retries = proplists:get_value(retries, Options, 3),
+	Retries = proplists:get_value(retries, Options, ?DEFAULT_RETRIES),
 	create(Value, Options, Retries).
 
 update(_, _, _, 0) ->
@@ -199,11 +201,11 @@ update(Key, Value, Options, Attempts) ->
 
 -spec update(Key :: binary(), Value :: binary()) -> ok | {error, term()}.
 update(Key, Value) ->
-	update(Key, Value, [], 3).
+	update(Key, Value, [], ?DEFAULT_RETRIES).
 
 -spec update(Key :: binary(), Value :: binary(), Options :: proplists:proplist()) -> ok | {error, term()}.
 update(Key, Value, Options) ->
-	Retries = proplists:get_value(retries, Options, 3),
+	Retries = proplists:get_value(retries, Options, ?DEFAULT_RETRIES),
 	update(Key, Value, Options, Retries).
 
 % Generate a random 32-byte url-safe string as a request cookie

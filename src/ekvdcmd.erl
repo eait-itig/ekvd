@@ -6,7 +6,8 @@ main(Args) ->
 		{host, "h", "host", string},
 		{port, "p", "port", string},
 		{retries, "r", "retries", integer},
-		{bucket, "b", "bucket", string}
+		{bucket, "b", "bucket", string},
+		{time, "t", "time", undefined}
 	],
 	Args2 = getopt(Args, Opts, []),
 	{OptArgs, ArgArgs} = lists:partition(fun(K) -> is_tuple(K) end, lists:reverse(Args2)),
@@ -30,7 +31,7 @@ getopt([[$-, $- | K], V | Rest], Opts, Args) ->
 			getopt(Rest, Opts, [{Atom, V} | Args]);
 		{Atom, _Short, K, integer} ->
 			getopt(Rest, Opts, [{Atom, list_to_integer(V)} | Args]);
-		{Atom, _Short, K, Atom} when (Atom =:= false) or (Atom =:= undefined) ->
+		{Atom, _Short, K, Type} when (Type =:= false) or (Type =:= undefined) ->
 			getopt([V | Rest], Opts, [{Atom, true} | Args]);
 		false ->
 			io:format("unknown option --~w\n", [K]),
@@ -42,7 +43,7 @@ getopt([[$- | K], V | Rest], Opts, Args) ->
 			getopt(Rest, Opts, [{Atom, V} | Args]);
 		{Atom, K, _Long, integer} ->
 			getopt(Rest, Opts, [{Atom, list_to_integer(V)} | Args]);
-		{Atom, K, _Long, Atom} when (Atom =:= false) or (Atom =:= undefined) ->
+		{Atom, K, _Long, Type} when (Type =:= false) or (Type =:= undefined) ->
 			getopt([V | Rest], Opts, [{Atom, true} | Args]);
 		false ->
 			io:format("unknown option -~w\n", [K]),
@@ -52,9 +53,26 @@ getopt([Next | Rest], Opts, Args) ->
 	getopt(Rest, Opts, [Next | Args]).
 
 main_opt(["get", Key], Opts) ->
+	T0 = os:timestamp(),
 	case ekvd:get(list_to_binary(Key), Opts) of
-		{ok, Data} -> io:format("~s\n", [Data]);
-		{error, Term} -> io:format("ERROR: ~p\n", [Term]), halt(1)
+		{ok, Data} ->
+			T1 = os:timestamp(),
+			io:format("~s\n", [Data]),
+			case proplists:get_value(time, Opts, false) of
+				true ->
+					io:format("time:\t~.2f\n", [timer:now_diff(T1, T0) / 1000]);
+				_ -> ok
+			end;
+		{error, novalue} ->
+			T1 = os:timestamp(),
+			io:format("notfound\n"),
+			case proplists:get_value(time, Opts, false) of
+				true ->
+					io:format("time:\t~.2f\n", [timer:now_diff(T1, T0) / 1000]);
+				_ -> ok
+			end;
+		{error, Term} ->
+			io:format("ERROR: ~p\n", [Term]), halt(1)
 	end;
 main_opt(["create", Val], Opts) ->
 	case ekvd:create(list_to_binary(Val), Opts) of
@@ -90,4 +108,5 @@ main_opt(_, _Opts) ->
 	io:format("         -p|--port [port]\n"),
 	io:format("         -r|--retries [num]\n"),
 	io:format("         -b|--bucket [bucket]\n"),
+	io:format("         -t|--time\n"),
 	halt(1).
