@@ -58,10 +58,20 @@ unpack_request(Bin) ->
 		{OpNum, zero_truncate(Key), Data}
 	end.
 
+try_set_size(_Sock, _Atom, Exp) when Exp =< 9 ->
+	error(bad_bufsize);
+try_set_size(Sock, Atom, Exp) ->
+	Opts = [{Atom, 1 bsl Exp}],
+	case inet:setopts(Sock, Opts) of
+		ok -> ok;
+		_ -> try_set_size(Sock, Atom, Exp - 1)
+	end.
+
 get(_, _, 0) ->
 	{error, timeout};
 get(Key, Options, Attempts) ->
 	{ok, Sock} = gen_udp:open(0, [binary]),
+	ok = try_set_size(Sock, recbuf, 17),
 	Payload = proplists:get_value(bucket, Options, <<>>),
 	Req = pack_request(?OP_REQUEST, Key, Payload),
 
@@ -105,6 +115,8 @@ checksig(_Uid, _Sig, _Data, _Opts, 0) ->
 	{error, timeout};
 checksig(Uid, Sig, Data, Options, Attempts) ->
 	{ok, Sock} = gen_udp:open(0, [binary]),
+	ok = try_set_size(Sock, sndbuf, 17),
+	ok = try_set_size(Sock, recbuf, 17),
 	Cookie = gen_cookie_id(),
 	Req = pack_checksig(Cookie, Uid, Sig, Data),
 
@@ -147,6 +159,8 @@ create(_, _, 0) ->
 	{error, timeout};
 create(Value, Options, Attempts) ->
 	{ok, Sock} = gen_udp:open(0, [binary]),
+	ok = try_set_size(Sock, sndbuf, 17),
+	ok = try_set_size(Sock, recbuf, 17),
 
 	Cookie = gen_cookie_id(),
 	Packet = pack_request(?OP_CREATE, Cookie, Value),
@@ -180,6 +194,8 @@ update(_, _, _, 0) ->
 	{error, timeout};
 update(Key, Value, Options, Attempts) ->
 	{ok, Sock} = gen_udp:open(0, [binary]),
+	ok = try_set_size(Sock, sndbuf, 17),
+	ok = try_set_size(Sock, recbuf, 17),
 
 	Packet = pack_request(?OP_UPDATE, Key, Value),
 
