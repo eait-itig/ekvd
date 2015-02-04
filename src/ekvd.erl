@@ -26,6 +26,17 @@
 
 -define(DEFAULT_RETRIES, 5).
 
+-define(CS_HMAC_SHA1, 1).
+-define(CS_HMAC_SHA256, 2).
+-define(CS_RSA_SHA1, 3).
+-define(CS_RSA_SHA256, 4).
+
+-type ip() :: tuple().
+-type sig_algo() :: hmac_sha1 | hmac_sha256 | rsa_sha1 | rsa_sha256.
+-type option() :: {retries, integer()} | {ip_address, ip()} | {port, integer()} | {bucket, binary()} | {algorithm, sig_algo()}.
+-type options() :: [option()].
+-export_type([options/0, option/0]).
+
 zero_truncate(Bin) ->
 	case binary:split(Bin, <<0:8>>) of
 		[Left, _] ->
@@ -39,10 +50,10 @@ pack_request(OpNum, Key, Payload) ->
 	PayloadSize = byte_size(Payload),
 	<<OpNum:8/integer, 0:8, PayloadSize:16/big, Key/binary, 0:PadBytes/unit:8, Payload/binary>>.
 
-pack_checksig(Cookie, Uid, Sig, Data) ->
+pack_checksig(Cookie, Uid, Algo, Sig, Data) ->
 	UidSize = byte_size(Uid),
 	SigSize = byte_size(Sig),
-	Payload = <<UidSize, Uid/binary, SigSize, Sig/binary, Data/binary>>,
+	Payload = <<UidSize, Uid/binary, Algo, SigSize, Sig/binary, Data/binary>>,
 	pack_request(?OP_CHECKSIG, Cookie, Payload).
 
 unpack_request(Bin) ->
@@ -106,7 +117,7 @@ get(Key) ->
 %%   <li><code>port</code> -- integer port to connect to</li>
 %%   <li><code>bucket</code> -- a bucket to provide as payload (for fakvd)</li>
 %% </ul>
--spec get(Key :: binary(), Options :: proplists:proplist()) -> {ok, binary()} | {error, term()}.
+-spec get(Key :: binary(), Options :: options()) -> {ok, binary()} | {error, term()}.
 get(Key, Options) ->
 	Retries = proplists:get_value(retries, Options, ?DEFAULT_RETRIES),
 	get(Key, Options, Retries).
@@ -118,7 +129,14 @@ checksig(Uid, Sig, Data, Options, Attempts) ->
 	ok = try_set_size(Sock, sndbuf, 17),
 	ok = try_set_size(Sock, recbuf, 17),
 	Cookie = gen_cookie_id(),
-	Req = pack_checksig(Cookie, Uid, Sig, Data),
+	AlgoAtom = proplists:get_value(algorithm, Options, hmac_sha1),
+	Algo = case AlgoAtom of
+		hmac_sha1 -> ?CS_HMAC_SHA1;
+		hmac_sha256 -> ?CS_HMAC_SHA256;
+		rsa_sha1 -> ?CS_RSA_SHA1;
+		rsa_sha256 -> ?CS_RSA_SHA256
+	end,
+	Req = pack_checksig(Cookie, Uid, Algo, Sig, Data),
 
 	IpAddr = proplists:get_value(ip_address, Options, {127, 0, 0, 1}),
 	Port = proplists:get_value(port, Options, 1080),
@@ -149,8 +167,9 @@ checksig(Uid, Sig, Data) ->
 %% <ul>
 %%   <li><code>ip_address</code> -- tuple format ip address to connect to</li>
 %%   <li><code>port</code> -- integer port to connect to</li>
+%%   <li><code>algorithm</code> -- algorithm used to verify signature</li>
 %% </ul>
--spec checksig(Uid :: binary(), Signature :: binary(), Data :: binary(), Options :: proplists:proplist()) -> {ok, binary()} | {error, term()}.
+-spec checksig(Uid :: binary(), Signature :: binary(), Data :: binary(), Options :: options()) -> {ok, binary()} | {error, term()}.
 checksig(Uid, Sig, Data, Options) ->
 	Retries = proplists:get_value(retries, Options, ?DEFAULT_RETRIES),
 	checksig(Uid, Sig, Data, Options, Retries).
@@ -185,7 +204,7 @@ create(Value, Options, Attempts) ->
 create(Value) ->
 	create(Value, [], ?DEFAULT_RETRIES).
 
--spec create(Value :: binary(), Options :: proplists:proplist()) -> {ok, Key :: binary()} | {error, term()}.
+-spec create(Value :: binary(), Options :: options()) -> {ok, Key :: binary()} | {error, term()}.
 create(Value, Options) ->
 	Retries = proplists:get_value(retries, Options, ?DEFAULT_RETRIES),
 	create(Value, Options, Retries).
@@ -219,7 +238,7 @@ update(Key, Value, Options, Attempts) ->
 update(Key, Value) ->
 	update(Key, Value, [], ?DEFAULT_RETRIES).
 
--spec update(Key :: binary(), Value :: binary(), Options :: proplists:proplist()) -> ok | {error, term()}.
+-spec update(Key :: binary(), Value :: binary(), Options :: options()) -> ok | {error, term()}.
 update(Key, Value, Options) ->
 	Retries = proplists:get_value(retries, Options, ?DEFAULT_RETRIES),
 	update(Key, Value, Options, Retries).
