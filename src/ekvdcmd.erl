@@ -7,7 +7,8 @@ main(Args) ->
 		{port, "p", "port", string},
 		{retries, "r", "retries", integer},
 		{bucket, "b", "bucket", string},
-		{time, "t", "time", undefined}
+		{time, "t", "time", undefined},
+		{timeout, "o", "timeout", integer}
 	],
 	Args2 = getopt(Args, Opts, []),
 	{OptArgs, ArgArgs} = lists:partition(fun(K) -> is_tuple(K) end, lists:reverse(Args2)),
@@ -106,6 +107,7 @@ main_opt(_, _Opts) ->
 	io:format("                      checksig <uid> <base64sig> <base64data>\n"),
 	io:format("options: -h|--host [hostname|ip]\n"),
 	io:format("         -p|--port [port]\n"),
+	io:format("         -o|--timeout [ms]\n"),
 	io:format("         -r|--retries [num]\n"),
 	io:format("         -b|--bucket [bucket]\n"),
 	io:format("         -t|--time\n"),
