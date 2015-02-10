@@ -84,6 +84,7 @@ get(Key, Options, Attempts) ->
 	{ok, Sock} = gen_udp:open(0, [binary]),
 	ok = try_set_size(Sock, recbuf, 17),
 	Payload = proplists:get_value(bucket, Options, <<>>),
+	Timeout = proplists:get_value(timeout, Options, 100),
 	Req = pack_request(?OP_REQUEST, Key, Payload),
 
 	IpAddr = proplists:get_value(ip_address, Options, {127, 0, 0, 1}),
@@ -100,8 +101,9 @@ get(Key, Options, Attempts) ->
 				_Other ->
 					{error, badresponse}
 			end
-	after 1000 ->
-		get(Key, Options, Attempts - 1)
+	after Timeout ->
+		Options2 = lists:keystore(timeout, 1, Options, {timeout, Timeout*2}),
+		get(Key, Options2, Attempts - 1)
 	end.
 
 %% @doc Gets the value associated with a given cookie.
@@ -116,6 +118,8 @@ get(Key) ->
 %%   <li><code>ip_address</code> -- tuple format ip address to connect to</li>
 %%   <li><code>port</code> -- integer port to connect to</li>
 %%   <li><code>bucket</code> -- a bucket to provide as payload (for fakvd)</li>
+%%   <li><code>timeout</code> -- initial timeout in ms, will be doubled at each retry. default 100</li>
+%%   <li><code>retries</code> -- number of retries</li>
 %% </ul>
 -spec get(Key :: binary(), Options :: options()) -> {ok, binary()} | {error, term()}.
 get(Key, Options) ->
